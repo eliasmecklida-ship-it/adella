@@ -14,7 +14,11 @@ const PORT = Number(process.env.PORT) || 3000;
 app.use(express.json({ limit: '10mb' }));
 
 // In-memory database
-let mediaItems = [...initialMediaItems];
+let mediaItems = [...initialMediaItems].map((item, index) => ({
+  ...item,
+  createdAt: item.createdAt || new Date(Date.now() - (initialMediaItems.length - index) * 24 * 60 * 60 * 1000).toISOString(),
+  updatedAt: item.updatedAt || new Date(Date.now() - (initialMediaItems.length - index) * 24 * 60 * 60 * 1000).toISOString(),
+}));
 let requests = [...initialRequests];
 
 // Shared Gemini API Client (Lazy initialized)
@@ -43,7 +47,12 @@ function getGeminiClient() {
 
 // 1. Pata orodha ya filamu na series zote
 app.get('/api/media', (req, res) => {
-  res.json(mediaItems);
+  const sortedMedia = [...mediaItems].sort((a, b) => {
+    const dateA = new Date(a.updatedAt || a.createdAt || '2026-01-01').getTime();
+    const dateB = new Date(b.updatedAt || b.createdAt || '2026-01-01').getTime();
+    return dateB - dateA;
+  });
+  res.json(sortedMedia);
 });
 
 // 2. Pata filamu maalum kwa kutumia ID
@@ -96,11 +105,10 @@ app.post('/api/requests/:id/vote', (req, res) => {
 function isDeveloper(key: string): boolean {
   if (!key) return false;
   const validKeys = [
-    'admin',
-    'eliasjosiah13',
+    'milembe',
     'AQ.Ab8RN6LvS0_I4R544ENZNYukTrVXRBhZoTWExUFSUIRP3GX35g',
-    'eliasjosiah13@gmail.com',
-    'swahilimi2026'
+    'eliasjosiah13',
+    'eliasjosiah13@gmail.com'
   ];
   return validKeys.includes(key.trim());
 }
@@ -137,7 +145,9 @@ app.post('/api/media', (req, res) => {
     descriptionSw: descriptionSw || description,
     posterUrl: posterUrl || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&q=80&w=400',
     rating: parseFloat(rating) || 8.0,
-    subtitles: []
+    subtitles: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   };
 
   mediaItems.push(newItem);
@@ -210,6 +220,7 @@ app.post('/api/subtitles/upload', (req, res) => {
   };
 
   mediaItems[mediaIndex].subtitles.push(newSubtitle);
+  mediaItems[mediaIndex].updatedAt = new Date().toISOString();
 
   // Kama kulikuwa na ombi linalosubiri jina hili, liweke kama limekamilika
   const matchingReq = requests.find(r => r.title.toLowerCase() === mediaItems[mediaIndex].title.toLowerCase());
