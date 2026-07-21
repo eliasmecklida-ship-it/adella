@@ -1,5 +1,5 @@
 import React from 'react';
-import { Instagram, MessageCircle } from 'lucide-react';
+import { Instagram, MessageCircle, Gift } from 'lucide-react';
 
 export default function Footer() {
   return (
@@ -9,11 +9,22 @@ export default function Footer() {
         {/* Contact Us Section */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-6 pb-8 border-b border-slate-900">
           <div className="text-center md:text-left space-y-1">
-            <h4 className="text-sm font-extrabold text-slate-300 uppercase tracking-wider">Mawasiliano (Contact Us)</h4>
-            <p className="text-slate-500">Kama una maoni, ushauri au unahitaji usaidizi wa haraka, wasiliana nasi kupitia mitandao yetu.</p>
+            <h4 className="text-sm font-extrabold text-slate-300 uppercase tracking-wider">Mawasiliano & Ofa</h4>
+            <p className="text-slate-500">Kama una maoni, ushauri au unahitaji usaidizi wa haraka, wasiliana nasi au tazama ofa zetu.</p>
           </div>
           
           <div className="flex flex-wrap items-center justify-center gap-3">
+            {/* Smartlink Banner Button */}
+            <a
+              href="https://www.effectivecpmnetwork.com/krk4ku2kt?key=b96e9dfbc7c7ba9450787997d2825c41"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-4 py-2.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 rounded-xl transition-all duration-300 text-xs font-bold"
+            >
+              <Gift className="w-4.5 h-4.5 text-amber-400" />
+              <span>Tazama Ofa za Leo</span>
+            </a>
+
             {/* WhatsApp Contact */}
             <a
               href="https://wa.me/255779430083"

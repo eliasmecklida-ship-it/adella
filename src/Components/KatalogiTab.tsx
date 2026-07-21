@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MediaItem, Subtitle } from '../types';
-import { Search, Star, Download, Heart, Tv, Film, Calendar, ChevronRight, ChevronDown, Award, ListFilter, Sparkles, Check } from 'lucide-react';
+import { Search, Star, Download, Heart, Tv, Film, Calendar, ChevronRight, ChevronDown, Award, ListFilter, Sparkles, Check, Gift, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface KatalogiTabProps {
@@ -75,6 +75,33 @@ export default function KatalogiTab({ mediaItems, onDownload }: KatalogiTabProps
 
   return (
     <div className="space-y-6">
+      {/* Adsterra Smartlink Promo Banner */}
+      <a
+        href="https://www.effectivecpmnetwork.com/krk4ku2kt?key=b96e9dfbc7c7ba9450787997d2825c41"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="group block p-4 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-slate-900 border border-amber-500/30 hover:border-amber-500/60 rounded-3xl transition-all duration-300 shadow-lg shadow-amber-500/5 hover:shadow-amber-500/10"
+      >
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-amber-500/20 text-amber-400 rounded-2xl group-hover:scale-105 transition-transform">
+              <Gift className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-xs sm:text-sm font-extrabold text-amber-400 group-hover:text-amber-300 flex items-center gap-1.5">
+                Ofa na Mipango Maalum ya Leo
+                <span className="text-[10px] bg-amber-500 text-slate-950 font-black px-2 py-0.5 rounded-full uppercase">Bure</span>
+              </h3>
+              <p className="text-[11px] text-slate-400 font-medium">Bofya hapa kufungua na kutazama matoleo mapya, zawadi na misaada ya kijamii.</p>
+            </div>
+          </div>
+          <div className="hidden sm:flex items-center gap-1 text-xs font-bold text-amber-400 group-hover:translate-x-1 transition-transform">
+            <span>Fungua Ofa</span>
+            <ExternalLink className="w-4 h-4" />
+          </div>
+        </div>
+      </a>
+
       {/* Search and Filters Section */}
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-slate-900/60 p-4 rounded-3xl border border-slate-800/80">
         <div className="relative w-full md:max-w-md">
