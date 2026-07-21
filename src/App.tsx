@@ -46,6 +46,19 @@ export default function App() {
     fetchData();
   }, []); // Empty array runs only once on mount
 
+  // Refresh media items list from server
+  const refreshMedia = async () => {
+    try {
+      const mediaRes = await fetch('/api/media');
+      if (mediaRes.ok) {
+        const mediaData = await mediaRes.json();
+        setMediaItems(mediaData);
+      }
+    } catch (err) {
+      console.error('Hitilafu wakati wa kusasisha katalogi:', err);
+    }
+  };
+
   // 1. Download subtitle action
   const handleDownload = async (subId: string, filename: string, srtContent: string) => {
     try {
@@ -134,16 +147,8 @@ export default function App() {
 
     const newSubtitle = await response.json();
 
-    // Update local state mediaItems subtitle count
-    setMediaItems(prev => prev.map(item => {
-      if (item.id === mediaId) {
-        return {
-          ...item,
-          subtitles: [...item.subtitles, newSubtitle]
-        };
-      }
-      return item;
-    }));
+    // Re-fetch media items from server to get the new sorted order (updatedAt is set to now on server)
+    await refreshMedia();
 
     // Re-fetch requests from server because some request might have been marked completed
     try {
@@ -254,7 +259,11 @@ export default function App() {
                 />
               )}
               {activeTab === 'changia' && (
-                <ChangiaTab mediaItems={mediaItems} onUploadSubmit={handleUploadSubmit} />
+                <ChangiaTab 
+                  mediaItems={mediaItems} 
+                  onUploadSubmit={handleUploadSubmit} 
+                  onMediaCreated={refreshMedia} 
+                />
               )}
             </motion.div>
           )}

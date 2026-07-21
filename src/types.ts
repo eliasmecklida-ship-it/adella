@@ -26,6 +26,8 @@ export interface MediaItem {
   posterUrl: string;
   rating: number;
   subtitles: Subtitle[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface SubtitleRequest {
