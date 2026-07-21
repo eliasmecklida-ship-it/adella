@@ -1,14 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MediaItem } from '../types';
-import { Key, Upload, FileText, CheckCircle, AlertCircle, Sparkles, LogOut, MessageSquare, Plus, Trash2, Film, Tv, Calendar, Star, ShieldCheck } from 'lucide-react';
+import { Key, Upload, FileText, CheckCircle, AlertCircle, Sparkles, LogOut, MessageSquare, Plus, Trash2, Film, Tv, Calendar, Star, ShieldCheck, Search } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface ChangiaTabProps {
   mediaItems: MediaItem[];
   onUploadSubmit: (mediaId: string, translator: string, srtContent: string, version: string, season?: string, episode?: string, episodeTitle?: string, developerKey?: string) => Promise<void>;
+  onMediaCreated?: () => void;
 }
 
-export default function ChangiaTab({ mediaItems, onUploadSubmit }: ChangiaTabProps) {
+export default function ChangiaTab({ mediaItems, onUploadSubmit, onMediaCreated }: ChangiaTabProps) {
   // Authentication State
   const [developerKey, setDeveloperKey] = useState('');
   const [isAuthorized, setIsAuthorized] = useState(false);
@@ -20,6 +21,14 @@ export default function ChangiaTab({ mediaItems, onUploadSubmit }: ChangiaTabPro
 
   // Subtitle Upload Form State
   const [selectedMediaId, setSelectedMediaId] = useState('');
+  const [mediaSearchQuery, setMediaSearchQuery] = useState('');
+
+  // Kuchuja filamu kwa ajili ya kuchagua kiurahisi
+  const filteredMediaItems = mediaItems.filter(m => 
+    m.title.toLowerCase().includes(mediaSearchQuery.toLowerCase()) ||
+    (m.originalTitle && m.originalTitle.toLowerCase().includes(mediaSearchQuery.toLowerCase())) ||
+    m.year.toString().includes(mediaSearchQuery)
+  );
   const [translator, setTranslator] = useState('');
   const [srtContent, setSrtContent] = useState('');
   const [version, setVersion] = useState('');
@@ -237,6 +246,10 @@ export default function ChangiaTab({ mediaItems, onUploadSubmit }: ChangiaTabPro
       setNewDescription('');
       setNewDescriptionSw('');
       
+      if (onMediaCreated) {
+        onMediaCreated();
+      }
+      
       // Auto refresh catalog list in App state can be triggered by refreshing the page or manual fetch
       // But we will also tell the user that it succeeded!
     } catch (err: any) {
@@ -309,7 +322,7 @@ export default function ChangiaTab({ mediaItems, onUploadSubmit }: ChangiaTabPro
                 <Key className="absolute left-3.5 top-3.5 h-4.5 w-4.5 text-slate-500" />
                 <input
                   type="password"
-                  placeholder="Ingiza password ya admin..."
+                  placeholder="Weka password"
                   value={developerKey}
                   onChange={(e) => setDeveloperKey(e.target.value)}
                   className="w-full pl-11 pr-4 py-3.5 bg-slate-950 border border-slate-800 rounded-2xl text-xs focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500/30 text-slate-300 font-mono"
@@ -327,7 +340,7 @@ export default function ChangiaTab({ mediaItems, onUploadSubmit }: ChangiaTabPro
           </form>
 
           <p className="text-[10px] text-slate-500 text-center">
-            Kidokezo: Tumia nenosiri ulilotayarisha, nenosiri la msanidi au API Key yako ya Google AI Studio kuingia.
+            Kidokezo: Tumia neno la siri <span className="text-amber-500/80 font-bold">milembe</span> au API Key yako kuingia.
           </p>
         </div>
       ) : (
@@ -430,6 +443,19 @@ export default function ChangiaTab({ mediaItems, onUploadSubmit }: ChangiaTabPro
                       <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">
                         Chagua Filamu au Series kutoka Katalogi *
                       </label>
+                      
+                      {/* Sanduku la Utafutaji wa Filamu */}
+                      <div className="relative">
+                        <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-500" />
+                        <input
+                          type="text"
+                          placeholder="Andika hapa kutafuta filamu kwenye orodha..."
+                          value={mediaSearchQuery}
+                          onChange={(e) => setMediaSearchQuery(e.target.value)}
+                          className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-850 hover:border-slate-800 focus:border-amber-500/50 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-amber-500/30 text-slate-300 placeholder:text-slate-600 transition-all"
+                        />
+                      </div>
+
                       <select
                         required
                         value={selectedMediaId}
@@ -441,12 +467,19 @@ export default function ChangiaTab({ mediaItems, onUploadSubmit }: ChangiaTabPro
                         }}
                         className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-xs focus:border-amber-500 focus:outline-none text-slate-300"
                       >
-                        <option value="">-- Chagua filamu hapa --</option>
-                        {mediaItems.map(m => (
+                        <option value="">
+                          {mediaSearchQuery 
+                            ? `-- Matokeo ya utafutaji (${filteredMediaItems.length}) --` 
+                            : '-- Chagua filamu hapa --'}
+                        </option>
+                        {filteredMediaItems.map(m => (
                           <option key={m.id} value={m.id}>
                             {m.title} ({m.type === 'movie' ? 'Movie' : 'Series'}) - {m.year}
                           </option>
                         ))}
+                        {filteredMediaItems.length === 0 && (
+                          <option disabled value="">Hakuna filamu iliyopatikana kwenye utafutaji wako</option>
+                        )}
                       </select>
                     </div>
 
