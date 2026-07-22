@@ -340,7 +340,7 @@ export default function ChangiaTab({ mediaItems, onUploadSubmit, onMediaCreated 
           </form>
 
           <p className="text-[10px] text-slate-500 text-center">
-            Kidokezo: Tumia neno la siri <span className="text-amber-500/80 font-bold">milembe</span> au API Key yako kuingia.
+            Kidokezo: Tumia neno la siri au API Key yako kuingia.
           </p>
         </div>
       ) : (
