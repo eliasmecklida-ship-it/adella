@@ -525,24 +525,25 @@ app.post('/api/translate', async (req, res) => {
         continue;
       }
 
-      const prompt = `Wewe ni mtafsiri stadi wa subtitles za filamu nchini Afrika Mashariki. Tafsiri maandishi yote ya Kiingereza yafuatayo kwenda Kiswahili sanifu, kinachoeleweka na chenye asili ya mazungumzo ya Bongo movie.
+      const prompt = `Wewe ni mtafsiri stadi wa subtitles za filamu nchini Tanzania na Afrika Mashariki. Tafsiri maandishi yote ya Kiingereza yafuatayo kwenda Kiswahili cha mazungumzo ya filamu (Bongo movie) kinachoeleweka vyema na kubeba hisia halisi.
 
-Maagizo ya ziada: "${instructions || 'Hakuna maagizo ya ziada.'}"
+Maagizo ya ziada kutoka kwa mtumiaji: "${instructions || 'Hakuna maagizo ya ziada.'}"
 
 Kanuni za kufuata kwa umakini:
 1. Kila kipengele cha "id" lazima kibaki vilevile kwenye jibu la JSON.
-2. Tafsiri kila maandishi ya "text" kwenda "translatedText" kwa Kiswahili kinachobeba hisia halisi za eneo hilo.
-3. Usiruke wala usibadilishe idadi ya vipengele vya JSON.
+2. Tafsiri kila maandishi ya "text" kwenda "translatedText" kwa Kiswahili. Usirudie maneno ya Kiingereza isipokuwa majina ya watu au maeneo.
+3. Kama kuna tag za HTML kama <i> au <b>, zihifadhi au tafsiri maneno yaliyomo ndani yake (mfano: <i>My name is...</i> inakuwa <i>Jina langu ni...</i>).
+4. Usiruke wala usibadilishe idadi ya vipengele vya JSON.
 
 Hii hapa orodha ya kutafsiri:
 ${JSON.stringify(itemsToTranslate)}`;
 
       try {
         const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-3.6-flash',
           contents: prompt,
           config: {
-            systemInstruction: "Wewe ni mkalimani wa kitaalamu wa subtitles. Unapokea JSON array ya vitu vyenye { id, text } na kurudisha JSON array ya vitu vyenye { id, translatedText }.",
+            systemInstruction: "Wewe ni mkalimani wa kitaalamu wa subtitles za filamu. Unapokea JSON array ya vitu vyenye { id, text } na unarudisha JSON array ya vitu vyenye { id, translatedText } ambapo kila maandishi yatafsiriwa kwa Kiswahili.",
             responseMimeType: 'application/json',
             responseSchema: {
               type: Type.ARRAY,
