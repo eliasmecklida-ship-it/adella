@@ -511,14 +511,19 @@ app.post('/api/translate', async (req, res) => {
     const batchSize = 20; // 20 blocks kwa mkupuo
     const totalBlocks = blocks.length;
     const translatedBlocks: SrtBlock[] = [];
+    let translationErrors: string[] = [];
+    let successfulBatches = 0;
 
     console.log(`Inaanza kutafsiri subtitle yenye block ${totalBlocks} kwa kutumia Gemini AI...`);
+
+    // Orodha ya models za kujaribu kwa uimara
+    const candidateModels = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro'];
 
     for (let i = 0; i < totalBlocks; i += batchSize) {
       const chunk = blocks.slice(i, i + batchSize);
       const itemsToTranslate = chunk
         .filter(b => b.text.trim().length > 0)
-        .map(b => ({ id: b.index, text: b.text }));
+        .map(b => ({ id: String(b.index), text: b.text }));
 
       if (itemsToTranslate.length === 0) {
         chunk.forEach(b => translatedBlocks.push(b));
@@ -531,60 +536,88 @@ Maagizo ya ziada kutoka kwa mtumiaji: "${instructions || 'Hakuna maagizo ya ziad
 
 Kanuni za kufuata kwa umakini:
 1. Kila kipengele cha "id" lazima kibaki vilevile kwenye jibu la JSON.
-2. Tafsiri kila maandishi ya "text" kwenda "translatedText" kwa Kiswahili. Usirudie maneno ya Kiingereza isipokuwa majina ya watu au maeneo.
-3. Kama kuna tag za HTML kama <i> au <b>, zihifadhi au tafsiri maneno yaliyomo ndani yake (mfano: <i>My name is...</i> inakuwa <i>Jina langu ni...</i>).
+2. Tafsiri kila maandishi ya "text" kwenda "translatedText" kwa Kiswahili. Usirudie maneno ya Kiingereza mfano "My name is" tafsiri "Jina langu ni".
+3. Kama kuna tag za HTML kama <i> au <b>, hifadhi tag hizo au tafsiri maneno yaliyomo ndani yake (mfano: <i>My name is David</i> inakuwa <i>Jina langu ni David</i>).
 4. Usiruke wala usibadilishe idadi ya vipengele vya JSON.
 
 Hii hapa orodha ya kutafsiri:
 ${JSON.stringify(itemsToTranslate)}`;
 
-      try {
-        const response = await ai.models.generateContent({
-          model: 'gemini-3.6-flash',
-          contents: prompt,
-          config: {
-            systemInstruction: "Wewe ni mkalimani wa kitaalamu wa subtitles za filamu. Unapokea JSON array ya vitu vyenye { id, text } na unarudisha JSON array ya vitu vyenye { id, translatedText } ambapo kila maandishi yatafsiriwa kwa Kiswahili.",
-            responseMimeType: 'application/json',
-            responseSchema: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  id: { type: Type.STRING },
-                  translatedText: { type: Type.STRING }
-                },
-                required: ['id', 'translatedText']
+      let batchSuccess = false;
+      let lastBatchError = '';
+
+      for (const modelName of candidateModels) {
+        try {
+          const response = await ai.models.generateContent({
+            model: modelName,
+            contents: prompt,
+            config: {
+              systemInstruction: "Wewe ni mkalimani wa kitaalamu wa subtitles za filamu. Unapokea JSON array ya vitu vyenye { id, text } na unarudisha JSON array ya vitu vyenye { id, translatedText } ambapo kila maandishi yatafsiriwa kwa Kiswahili.",
+              responseMimeType: 'application/json',
+              responseSchema: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    id: { type: Type.STRING },
+                    translatedText: { type: Type.STRING }
+                  },
+                  required: ['id', 'translatedText']
+                }
               }
             }
-          }
-        });
-
-        const responseText = response.text;
-        if (!responseText) {
-          throw new Error('Maudhui ya jibu la Gemini hayakupatikana.');
-        }
-
-        const translatedArray: Array<{ id: string; translatedText: string }> = JSON.parse(responseText.trim());
-        const resultMap = new Map<string, string>();
-        translatedArray.forEach(item => {
-          if (item.id && item.translatedText) {
-            resultMap.set(String(item.id), item.translatedText);
-          }
-        });
-
-        chunk.forEach(b => {
-          const newText = resultMap.get(String(b.index));
-          translatedBlocks.push({
-            ...b,
-            text: newText || b.text
           });
-        });
 
-      } catch (err) {
-        console.error(`Hitilafu imetokea kwenye batch ${i}:`, err);
-        // Fallback: Kama batch moja inafeli, tunaiacha ikiwa na asili ili programu isikwame kabisa
+          let responseText = response.text || '';
+          if (!responseText) {
+            throw new Error(`Model ${modelName} returned empty text response.`);
+          }
+
+          // Safisha Markdown fences kama zipo
+          let cleanJson = responseText.trim();
+          if (cleanJson.startsWith('```')) {
+            cleanJson = cleanJson.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+          }
+
+          const translatedArray: any[] = JSON.parse(cleanJson);
+          const resultMap = new Map<string, string>();
+
+          if (Array.isArray(translatedArray)) {
+            translatedArray.forEach(item => {
+              if (item && item.id !== undefined && item.translatedText) {
+                resultMap.set(String(item.id), item.translatedText);
+              }
+            });
+          }
+
+          chunk.forEach(b => {
+            const newText = resultMap.get(String(b.index));
+            translatedBlocks.push({
+              ...b,
+              text: newText || b.text
+            });
+          });
+
+          batchSuccess = true;
+          successfulBatches++;
+          break; // Batch response retrieved successfully!
+        } catch (err: any) {
+          lastBatchError = err?.message || String(err);
+          console.warn(`Jaribio la model ${modelName} limeshindwa kwenye batch ${i}: ${lastBatchError}`);
+        }
+      }
+
+      if (!batchSuccess) {
+        console.error(`Batch ${i} imefeli kabisa kwa models zote. Error: ${lastBatchError}`);
+        translationErrors.push(`Batch ${i}: ${lastBatchError}`);
         chunk.forEach(b => translatedBlocks.push(b));
       }
+    }
+
+    if (successfulBatches === 0 && translationErrors.length > 0) {
+      return res.status(500).json({
+        error: `Tafsiri imeshindwa: ${translationErrors[0]}. Tafadhali hakikisha GEMINI_API_KEY iliyowekwa kwenye Render ni sahihi na haijatishwa (inaanza na AIzaSy...).`
+      });
     }
 
     const translatedSrt = reconstructSrt(translatedBlocks);
