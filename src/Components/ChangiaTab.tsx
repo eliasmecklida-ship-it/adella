@@ -17,7 +17,9 @@ export default function ChangiaTab({ mediaItems, onUploadSubmit, onMediaCreated 
   const [isVerifying, setIsVerifying] = useState(false);
 
   // Active Developer Section
-  const [subTab, setSubTab] = useState<'upload' | 'requests' | 'add_media'>('upload');
+  const [subTab, setSubTab] = useState<'upload' | 'requests' | 'add_media' | 'manage_media'>('upload');
+  const [manageSearchQuery, setManageSearchQuery] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Subtitle Upload Form State
   const [selectedMediaId, setSelectedMediaId] = useState('');
@@ -86,6 +88,31 @@ export default function ChangiaTab({ mediaItems, onUploadSubmit, onMediaCreated 
       console.error(e);
     } finally {
       setRequestsLoading(false);
+    }
+  };
+
+  const handleDeleteMediaItem = async (mediaId: string, title: string) => {
+    if (!window.confirm(`Je, una uhakika unataka kufuta "${title}" kabisa kutoka kwenye mfumo?`)) {
+      return;
+    }
+
+    setDeletingId(mediaId);
+    try {
+      const res = await fetch(`/api/media/${mediaId}?developerKey=${encodeURIComponent(developerKey)}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        if (onMediaCreated) {
+          onMediaCreated();
+        }
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Imeshindikana kufuta filamu.');
+      }
+    } catch (err) {
+      alert('Hitilafu imetokea wakati wa kufuta.');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -406,6 +433,17 @@ export default function ChangiaTab({ mediaItems, onUploadSubmit, onMediaCreated 
             >
               <Plus className="w-4 h-4" />
               Sajili Filamu/Series Mpya
+            </button>
+            <button
+              onClick={() => setSubTab('manage_media')}
+              className={`px-4 py-3 text-xs font-black transition-all border-b-2 flex items-center gap-1.5 ${
+                subTab === 'manage_media'
+                  ? 'border-red-500 text-red-500 bg-slate-900/10'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Trash2 className="w-4 h-4 text-red-400" />
+              Dhibiti / Futa Filamu ({mediaItems.length})
             </button>
           </div>
 
@@ -850,6 +888,76 @@ export default function ChangiaTab({ mediaItems, onUploadSubmit, onMediaCreated 
                     {isCreatingMedia ? 'Inasajili sasa...' : 'Sajili Kwenye Katalogi'}
                   </button>
                 </form>
+              </div>
+            )}
+
+            {/* 2D. Sub-Tab: Dhibiti / Futa Filamu au Series */}
+            {subTab === 'manage_media' && (
+              <div className="space-y-6">
+                <div className="border-b border-slate-850 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+                      <Trash2 className="w-4.5 h-4.5 text-red-500" /> Dhibiti na Futa Filamu/Series kwenye Mfumo
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">Ukiifuta filamu/series hapa, itaondolewa mara moja kwenye tovuti.</p>
+                  </div>
+
+                  <div className="relative min-w-[240px]">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                    <input
+                      type="text"
+                      placeholder="Tafuta filamu ya kufuta..."
+                      value={manageSearchQuery}
+                      onChange={(e) => setManageSearchQuery(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+
+                {mediaItems.filter(m =>
+                  m.title.toLowerCase().includes(manageSearchQuery.toLowerCase()) ||
+                  (m.originalTitle && m.originalTitle.toLowerCase().includes(manageSearchQuery.toLowerCase())) ||
+                  m.year.toString().includes(manageSearchQuery)
+                ).length === 0 ? (
+                  <p className="text-center text-slate-500 text-xs py-8">Hakuna filamu au series iliyopatikana kulingana na utafutaji wako.</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[500px] overflow-y-auto pr-1">
+                    {mediaItems.filter(m =>
+                      m.title.toLowerCase().includes(manageSearchQuery.toLowerCase()) ||
+                      (m.originalTitle && m.originalTitle.toLowerCase().includes(manageSearchQuery.toLowerCase())) ||
+                      m.year.toString().includes(manageSearchQuery)
+                    ).map((item) => (
+                      <div key={item.id} className="p-3.5 bg-slate-950/60 border border-slate-850 rounded-2xl flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <img
+                            src={item.posterUrl}
+                            alt={item.title}
+                            referrerPolicy="no-referrer"
+                            className="w-12 h-16 object-cover rounded-lg flex-shrink-0 bg-slate-900 border border-slate-800"
+                          />
+                          <div className="min-w-0">
+                            <h4 className="text-xs font-black text-white truncate">{item.title}</h4>
+                            <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-400">
+                              <span className="px-1.5 py-0.5 bg-slate-800 rounded text-slate-300 font-bold uppercase">{item.type}</span>
+                              <span>{item.year}</span>
+                              <span>•</span>
+                              <span>Subtitles {item.subtitles.length}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => handleDeleteMediaItem(item.id, item.title)}
+                          disabled={deletingId === item.id}
+                          className="px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 hover:border-red-500/40 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all flex-shrink-0"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          {deletingId === item.id ? 'Inafuta...' : 'Futa'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
