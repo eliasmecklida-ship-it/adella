@@ -516,8 +516,8 @@ app.post('/api/translate', async (req, res) => {
 
     console.log(`Inaanza kutafsiri subtitle yenye block ${totalBlocks} kwa kutumia Gemini AI...`);
 
-    // Orodha ya models za kujaribu kwa uimara
-    const candidateModels = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro'];
+    // Orodha ya models za Gemini halali kwa kutafsiri
+    const candidateModels = ['gemini-3.6-flash', 'gemini-3.1-pro-preview'];
 
     for (let i = 0; i < totalBlocks; i += batchSize) {
       const chunk = blocks.slice(i, i + batchSize);
