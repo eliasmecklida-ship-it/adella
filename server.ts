@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
@@ -13,13 +14,43 @@ const PORT = Number(process.env.PORT) || 3000;
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 
-// In-memory database
-let mediaItems = [...initialMediaItems].map((item, index) => ({
-  ...item,
-  createdAt: item.createdAt || new Date(Date.now() - (initialMediaItems.length - index) * 24 * 60 * 60 * 1000).toISOString(),
-  updatedAt: item.updatedAt || new Date(Date.now() - (initialMediaItems.length - index) * 24 * 60 * 60 * 1000).toISOString(),
-}));
-let requests = [...initialRequests];
+// Persistent File Storage (data_store.json)
+const DATA_FILE = path.join(process.cwd(), 'data_store.json');
+
+function loadStoredData() {
+  try {
+    if (fs.existsSync(DATA_FILE)) {
+      const fileData = fs.readFileSync(DATA_FILE, 'utf-8');
+      const parsed = JSON.parse(fileData);
+      return parsed;
+    }
+  } catch (err) {
+    console.error('Hitilafu ya kusoma data_store.json:', err);
+  }
+  return null;
+}
+
+function saveData() {
+  try {
+    fs.writeFileSync(DATA_FILE, JSON.stringify({ mediaItems, requests }, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Hitilafu ya kuhifadhi data_store.json:', err);
+  }
+}
+
+const initialLoaded = loadStoredData();
+
+let mediaItems = initialLoaded && Array.isArray(initialLoaded.mediaItems) && initialLoaded.mediaItems.length > 0
+  ? initialLoaded.mediaItems
+  : [...initialMediaItems].map((item, index) => ({
+      ...item,
+      createdAt: item.createdAt || new Date(Date.now() - (initialMediaItems.length - index) * 24 * 60 * 60 * 1000).toISOString(),
+      updatedAt: item.updatedAt || new Date(Date.now() - (initialMediaItems.length - index) * 24 * 60 * 60 * 1000).toISOString(),
+    }));
+
+let requests = initialLoaded && Array.isArray(initialLoaded.requests) && initialLoaded.requests.length > 0
+  ? initialLoaded.requests
+  : [...initialRequests];
 
 // Shared Gemini API Client (Lazy initialized)
 let aiClient: GoogleGenAI | null = null;
@@ -83,6 +114,7 @@ app.post('/api/subtitles/request', (req, res) => {
   };
 
   requests.push(newRequest);
+  saveData();
   res.status(201).json(newRequest);
 });
 
@@ -98,6 +130,7 @@ app.post('/api/requests/:id/vote', (req, res) => {
     return res.status(404).json({ error: 'Ombi hili halikupatikana.' });
   }
   request.votes += 1;
+  saveData();
   res.json(request);
 });
 
@@ -151,7 +184,25 @@ app.post('/api/media', (req, res) => {
   };
 
   mediaItems.push(newItem);
+  saveData();
   res.status(201).json(newItem);
+});
+
+// Admin Route: Futa Movie au Series iliyopo
+app.delete('/api/media/:id', (req, res) => {
+  const { developerKey } = req.query;
+  if (!isDeveloper(developerKey as string)) {
+    return res.status(401).json({ error: 'Huruhusiwi! Sehemu hii ni ya msanidi tu.' });
+  }
+
+  const mediaIndex = mediaItems.findIndex(m => m.id === req.params.id);
+  if (mediaIndex === -1) {
+    return res.status(404).json({ error: 'Filamu au Series haikupatikana.' });
+  }
+
+  const deletedItem = mediaItems.splice(mediaIndex, 1)[0];
+  saveData();
+  res.json({ success: true, message: `Filamu/Series "${deletedItem.title}" imefutwa vyema.` });
 });
 
 // Admin Route: Futa ombi la subtitle
@@ -167,6 +218,7 @@ app.delete('/api/requests/:id', (req, res) => {
   }
 
   requests.splice(reqIndex, 1);
+  saveData();
   res.json({ success: true, message: 'Ombi limefutwa vyema.' });
 });
 
@@ -183,6 +235,7 @@ app.post('/api/requests/:id/complete', (req, res) => {
   }
 
   request.status = 'completed';
+  saveData();
   res.json(request);
 });
 
@@ -228,6 +281,7 @@ app.post('/api/subtitles/upload', (req, res) => {
     matchingReq.status = 'completed';
   }
 
+  saveData();
   res.status(201).json(newSubtitle);
 });
 
@@ -242,6 +296,7 @@ app.post('/api/subtitles/:id/download', (req, res) => {
       break;
     }
   }
+  if (found) saveData();
   res.json({ success: found });
 });
 
