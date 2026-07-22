@@ -4,6 +4,8 @@ import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
+import { initializeApp, getApps } from 'firebase/app';
+import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { initialMediaItems, initialRequests } from './src/data/catalog.js';
 
 dotenv.config();
@@ -51,6 +53,102 @@ let mediaItems = initialLoaded && Array.isArray(initialLoaded.mediaItems) && ini
 let requests = initialLoaded && Array.isArray(initialLoaded.requests) && initialLoaded.requests.length > 0
   ? initialLoaded.requests
   : [...initialRequests];
+
+// Initialize Firebase Firestore Database
+let db: ReturnType<typeof getFirestore> | null = null;
+try {
+  const firebaseConfigPath = path.join(process.cwd(), 'firebase-applet-config.json');
+  if (fs.existsSync(firebaseConfigPath)) {
+    const firebaseConfig = JSON.parse(fs.readFileSync(firebaseConfigPath, 'utf-8'));
+    const firebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+    db = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId || undefined);
+    console.log('Firebase Firestore imewezeshwa vyema!');
+  }
+} catch (err) {
+  console.error('Hitilafu ya kuanzisha Firebase Firestore:', err);
+}
+
+// Landanisha data za mwanzo kutoka/kwenda Firebase Firestore
+async function initFirestoreData() {
+  if (!db) return;
+  try {
+    const mediaSnap = await getDocs(collection(db, 'mediaItems'));
+    if (!mediaSnap.empty) {
+      const fetchedMedia: any[] = [];
+      mediaSnap.forEach((docSnap) => {
+        fetchedMedia.push(docSnap.data());
+      });
+      if (fetchedMedia.length > 0) {
+        mediaItems = fetchedMedia;
+        saveData();
+        console.log(`Zimepakiwa filamu ${fetchedMedia.length} kutoka Firebase Firestore.`);
+      }
+    } else {
+      console.log('Firebase Firestore haina filamu, inaweka data za mwanzo...');
+      for (const item of mediaItems) {
+        await setDoc(doc(db, 'mediaItems', item.id), item);
+      }
+    }
+
+    const reqSnap = await getDocs(collection(db, 'requests'));
+    if (!reqSnap.empty) {
+      const fetchedReqs: any[] = [];
+      reqSnap.forEach((docSnap) => {
+        fetchedReqs.push(docSnap.data());
+      });
+      if (fetchedReqs.length > 0) {
+        requests = fetchedReqs;
+        saveData();
+        console.log(`Zimepakiwa maombi ${fetchedReqs.length} kutoka Firebase Firestore.`);
+      }
+    } else {
+      console.log('Firebase Firestore haina maombi, inaweka data za mwanzo...');
+      for (const reqItem of requests) {
+        await setDoc(doc(db, 'requests', reqItem.id), reqItem);
+      }
+    }
+  } catch (err) {
+    console.error('Hitilafu wakati wa kulandanisha na Firebase Firestore:', err);
+  }
+}
+
+initFirestoreData();
+
+async function saveMediaToFirestore(item: any) {
+  if (!db) return;
+  try {
+    await setDoc(doc(db, 'mediaItems', item.id), item);
+  } catch (err) {
+    console.error(`Hitilafu ya kuhifadhi media ${item.id} Firebase:`, err);
+  }
+}
+
+async function deleteMediaFromFirestore(itemId: string) {
+  if (!db) return;
+  try {
+    await deleteDoc(doc(db, 'mediaItems', itemId));
+  } catch (err) {
+    console.error(`Hitilafu ya kufuta media ${itemId} Firebase:`, err);
+  }
+}
+
+async function saveRequestToFirestore(reqItem: any) {
+  if (!db) return;
+  try {
+    await setDoc(doc(db, 'requests', reqItem.id), reqItem);
+  } catch (err) {
+    console.error(`Hitilafu ya kuhifadhi ombi ${reqItem.id} Firebase:`, err);
+  }
+}
+
+async function deleteRequestFromFirestore(reqId: string) {
+  if (!db) return;
+  try {
+    await deleteDoc(doc(db, 'requests', reqId));
+  } catch (err) {
+    console.error(`Hitilafu ya kufuta ombi ${reqId} Firebase:`, err);
+  }
+}
 
 // Shared Gemini API Client (Lazy initialized)
 let aiClient: GoogleGenAI | null = null;
@@ -115,6 +213,7 @@ app.post('/api/subtitles/request', (req, res) => {
 
   requests.push(newRequest);
   saveData();
+  saveRequestToFirestore(newRequest);
   res.status(201).json(newRequest);
 });
 
@@ -131,6 +230,7 @@ app.post('/api/requests/:id/vote', (req, res) => {
   }
   request.votes += 1;
   saveData();
+  saveRequestToFirestore(request);
   res.json(request);
 });
 
@@ -185,6 +285,7 @@ app.post('/api/media', (req, res) => {
 
   mediaItems.push(newItem);
   saveData();
+  saveMediaToFirestore(newItem);
   res.status(201).json(newItem);
 });
 
@@ -202,6 +303,7 @@ app.delete('/api/media/:id', (req, res) => {
 
   const deletedItem = mediaItems.splice(mediaIndex, 1)[0];
   saveData();
+  deleteMediaFromFirestore(req.params.id);
   res.json({ success: true, message: `Filamu/Series "${deletedItem.title}" imefutwa vyema.` });
 });
 
@@ -219,6 +321,7 @@ app.delete('/api/requests/:id', (req, res) => {
 
   requests.splice(reqIndex, 1);
   saveData();
+  deleteRequestFromFirestore(req.params.id);
   res.json({ success: true, message: 'Ombi limefutwa vyema.' });
 });
 
@@ -236,6 +339,7 @@ app.post('/api/requests/:id/complete', (req, res) => {
 
   request.status = 'completed';
   saveData();
+  saveRequestToFirestore(request);
   res.json(request);
 });
 
@@ -279,24 +383,31 @@ app.post('/api/subtitles/upload', (req, res) => {
   const matchingReq = requests.find(r => r.title.toLowerCase() === mediaItems[mediaIndex].title.toLowerCase());
   if (matchingReq) {
     matchingReq.status = 'completed';
+    saveRequestToFirestore(matchingReq);
   }
 
   saveData();
+  saveMediaToFirestore(mediaItems[mediaIndex]);
   res.status(201).json(newSubtitle);
 });
 
 // 7. Ongeza idadi ya downloads kwa subtitle fulani
 app.post('/api/subtitles/:id/download', (req, res) => {
   let found = false;
+  let targetMedia = null;
   for (const item of mediaItems) {
     const sub = item.subtitles.find(s => s.id === req.params.id);
     if (sub) {
       sub.downloads += 1;
       found = true;
+      targetMedia = item;
       break;
     }
   }
-  if (found) saveData();
+  if (found && targetMedia) {
+    saveData();
+    saveMediaToFirestore(targetMedia);
+  }
   res.json({ success: found });
 });
 

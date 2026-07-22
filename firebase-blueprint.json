@@ -1,0 +1,27 @@
+{
+  "entities": {
+    "mediaItems": {
+      "title": "Media Items",
+      "description": "Filamu na Series zinazopatikana kwenye mfumo",
+      "fields": {
+        "id": { "type": "string", "description": "Unique identifier" },
+        "title": { "type": "string", "description": "Kichwa cha filamu" },
+        "type": { "type": "string", "description": "movie au series" },
+        "posterUrl": { "type": "string", "description": "Link ya poster" },
+        "year": { "type": "number", "description": "Mwaka" },
+        "description": { "type": "string", "description": "Maelezo" },
+        "subtitles": { "type": "array", "description": "Orodha ya subtitles" }
+      }
+    },
+    "requests": {
+      "title": "Requests",
+      "description": "Maombi ya subtitles",
+      "fields": {
+        "id": { "type": "string", "description": "Unique identifier" },
+        "mediaTitle": { "type": "string", "description": "Jina la filamu" },
+        "votes": { "type": "number", "description": "Kura" },
+        "status": { "type": "string", "description": "Hali ya ombi" }
+      }
+    }
+  }
+}
