@@ -508,48 +508,52 @@ app.post('/api/translate', async (req, res) => {
     }
 
     // Kama Gemini ipo, tutatafsiri kwa makundi (batching) ili kuepuka token limits na kukuza ubora
-    const batchSize = 15; // 15 blocks kwa mkupuo ni salama na haraka sana
+    const batchSize = 20; // 20 blocks kwa mkupuo
     const totalBlocks = blocks.length;
     const translatedBlocks: SrtBlock[] = [];
 
-    console.log(`Inaanza kutafsiri subtitle yenye block ${totalBlocks} kwa kutumia Gemini...`);
+    console.log(`Inaanza kutafsiri subtitle yenye block ${totalBlocks} kwa kutumia Gemini AI...`);
 
     for (let i = 0; i < totalBlocks; i += batchSize) {
       const chunk = blocks.slice(i, i + batchSize);
-      const originalTexts = chunk.map(b => b.text).filter(t => t.length > 0);
+      const itemsToTranslate = chunk
+        .filter(b => b.text.trim().length > 0)
+        .map(b => ({ id: b.index, text: b.text }));
 
-      if (originalTexts.length === 0) {
-        // Kama zote ni tupu
+      if (itemsToTranslate.length === 0) {
         chunk.forEach(b => translatedBlocks.push(b));
         continue;
       }
 
-      const prompt = `Wewe ni mtafsiri bora kabisa wa subtitles za filamu nchini Afrika Mashariki. Jukumu lako ni kutafsiri orodha ya sentensi au maneno yafuatayo kutoka Kiingereza kwenda Kiswahili sanifu chenye asili ya mazungumzo (mazungumzo ya asili ya Bongo movie yanayovutia na kueleweka kwa urahisi).
+      const prompt = `Wewe ni mtafsiri stadi wa subtitles za filamu nchini Afrika Mashariki. Tafsiri maandishi yote ya Kiingereza yafuatayo kwenda Kiswahili sanifu, kinachoeleweka na chenye asili ya mazungumzo ya Bongo movie.
 
-Maagizo maalum kutoka kwa mtumiaji: "${instructions || 'Hakuna maagizo ya ziada.'}"
+Maagizo ya ziada: "${instructions || 'Hakuna maagizo ya ziada.'}"
 
-Hakikisha:
-1. Unadumisha hisia (masikhara, hofu, huzuni, ukali, kejeli) katika maneno.
-2. Usijaribu kutafsiri neno kwa neno kama mkalimani wa mashine, bali tafsiri kulingana na muktadha wa maisha ya kila siku (Kiswahili kilichozoeleka kwenye filamu za ucheshi au mapigano).
-3. Usibadilishe jina lolote la mtu, chapa ya gari, au jiji.
-4. Rudisha idadi ile ile ya sentensi kama iliyoingizwa, ukitumia mpangilio sawia kabisa wa orodha ya JSON.
+Kanuni za kufuata kwa umakini:
+1. Kila kipengele cha "id" lazima kibaki vilevile kwenye jibu la JSON.
+2. Tafsiri kila maandishi ya "text" kwenda "translatedText" kwa Kiswahili kinachobeba hisia halisi za eneo hilo.
+3. Usiruke wala usibadilishe idadi ya vipengele vya JSON.
 
-Hapa kuna orodha ya sentensi za kutafsiri (katika muundo wa JSON array):
-${JSON.stringify(originalTexts)}`;
+Hii hapa orodha ya kutafsiri:
+${JSON.stringify(itemsToTranslate)}`;
 
       try {
         const response = await ai.models.generateContent({
-          model: 'gemini-3.5-flash',
+          model: 'gemini-2.5-flash',
           contents: prompt,
           config: {
-            systemInstruction: "Wewe ni mfumo mtaalamu wa kutafsiri subtitles za filamu. Unapokea JSON array ya maneno ya Kiingereza na kurudisha JSON array yenye tafsiri za Kiswahili tu.",
+            systemInstruction: "Wewe ni mkalimani wa kitaalamu wa subtitles. Unapokea JSON array ya vitu vyenye { id, text } na kurudisha JSON array ya vitu vyenye { id, translatedText }.",
             responseMimeType: 'application/json',
             responseSchema: {
               type: Type.ARRAY,
               items: {
-                type: Type.STRING
-              },
-              description: "Orodha ya tafsiri za Kiswahili zinazolingana kabisa na orodha iliyoingizwa."
+                type: Type.OBJECT,
+                properties: {
+                  id: { type: Type.STRING },
+                  translatedText: { type: Type.STRING }
+                },
+                required: ['id', 'translatedText']
+              }
             }
           }
         });
@@ -559,22 +563,20 @@ ${JSON.stringify(originalTexts)}`;
           throw new Error('Maudhui ya jibu la Gemini hayakupatikana.');
         }
 
-        const swahiliTexts: string[] = JSON.parse(responseText.trim());
-
-        // Kujaza tena kwenye blocks zetu
-        let swahiliIndex = 0;
-        chunk.forEach(b => {
-          if (b.text.length > 0) {
-            // Kama kulikuwa na tafsiri halali, tunaiweka. Vinginevyo tunabaki na asili.
-            const translatedText = swahiliTexts[swahiliIndex] || b.text;
-            translatedBlocks.push({
-              ...b,
-              text: translatedText
-            });
-            swahiliIndex++;
-          } else {
-            translatedBlocks.push(b);
+        const translatedArray: Array<{ id: string; translatedText: string }> = JSON.parse(responseText.trim());
+        const resultMap = new Map<string, string>();
+        translatedArray.forEach(item => {
+          if (item.id && item.translatedText) {
+            resultMap.set(String(item.id), item.translatedText);
           }
+        });
+
+        chunk.forEach(b => {
+          const newText = resultMap.get(String(b.index));
+          translatedBlocks.push({
+            ...b,
+            text: newText || b.text
+          });
         });
 
       } catch (err) {
