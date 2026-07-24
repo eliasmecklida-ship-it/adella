@@ -14,6 +14,7 @@ export default function KatalogiTab({ mediaItems, onDownload }: KatalogiTabProps
   const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [expandedSeason, setExpandedSeason] = useState<number | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
   // Pakia favorites kutoka localStorage wakati wa kuwasha
   useEffect(() => {
@@ -60,6 +61,10 @@ export default function KatalogiTab({ mediaItems, onDownload }: KatalogiTabProps
 
     return matchSearch;
   });
+
+  // Ikiwa mtumiaji hajatafuta wala kuchuja, tunaonyesha filamu 4 tu za mwisho kusajiliwa
+  const isDefaultView = searchQuery.trim() === '' && filterType === 'all';
+  const displayedItems = (isDefaultView && !showAll) ? filteredItems.slice(0, 4) : filteredItems;
 
   // Kuchagua season ya kwanza kiotomatiki wakati wa kufungua series
   useEffect(() => {
@@ -164,7 +169,7 @@ export default function KatalogiTab({ mediaItems, onDownload }: KatalogiTabProps
       </div>
 
       {/* Catalog Grid */}
-      {filteredItems.length === 0 ? (
+      {displayedItems.length === 0 ? (
         <div className="text-center py-24 bg-slate-900/20 border border-slate-900 rounded-3xl p-8">
           <Film className="w-12 h-12 text-slate-600 mx-auto mb-4" />
           <h3 className="text-lg font-bold text-slate-300">Hakuna kilichopatikana</h3>
@@ -173,78 +178,106 @@ export default function KatalogiTab({ mediaItems, onDownload }: KatalogiTabProps
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredItems.map(item => {
-            const isFav = item.subtitles.some(sub => favorites.includes(sub.id));
-            return (
-              <motion.div
-                key={item.id}
-                layoutId={`media-card-${item.id}`}
-                onClick={() => setSelectedItem(item)}
-                className="bg-slate-900/40 border border-slate-800/80 hover:border-amber-500/30 rounded-3xl overflow-hidden cursor-pointer group transition-all duration-300 flex flex-col h-full hover:shadow-xl hover:shadow-amber-500/5"
-              >
-                {/* Poster Container */}
-                <div className="relative aspect-video sm:aspect-square overflow-hidden bg-slate-950">
-                  <img
-                    src={item.posterUrl}
-                    alt={item.title}
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-all duration-500"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-80" />
-                  
-                  {/* Rating Badge */}
-                  <div className="absolute top-3 left-3 bg-slate-950/80 backdrop-blur-md border border-slate-800 px-2 py-1 rounded-lg flex items-center gap-1">
-                    <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
-                    <span className="text-[10px] font-bold text-slate-200">{item.rating}</span>
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {displayedItems.map(item => {
+              const isFav = item.subtitles.some(sub => favorites.includes(sub.id));
+              return (
+                <motion.div
+                  key={item.id}
+                  layoutId={`media-card-${item.id}`}
+                  onClick={() => setSelectedItem(item)}
+                  className="bg-slate-900/40 border border-slate-800/80 hover:border-amber-500/30 rounded-3xl overflow-hidden cursor-pointer group transition-all duration-300 flex flex-col h-full hover:shadow-xl hover:shadow-amber-500/5"
+                >
+                  {/* Poster Container */}
+                  <div className="relative aspect-video sm:aspect-square overflow-hidden bg-slate-950">
+                    <img
+                      src={item.posterUrl}
+                      alt={item.title}
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-all duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-80" />
+                    
+                    {/* Rating Badge */}
+                    <div className="absolute top-3 left-3 bg-slate-950/80 backdrop-blur-md border border-slate-800 px-2 py-1 rounded-lg flex items-center gap-1">
+                      <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
+                      <span className="text-[10px] font-bold text-slate-200">{item.rating}</span>
+                    </div>
+
+                    {/* Type Badge */}
+                    <div className="absolute top-3 right-3 bg-amber-500 text-slate-950 px-2 py-1 rounded-lg text-[9px] font-extrabold uppercase tracking-wider">
+                      {item.type === 'movie' ? 'Movie' : 'Series'}
+                    </div>
+
+                    {/* Favorites badge indicator */}
+                    {isFav && (
+                      <div className="absolute bottom-3 right-3 p-1.5 bg-red-500 text-white rounded-full">
+                        <Heart className="w-3.5 h-3.5 fill-current" />
+                      </div>
+                    )}
                   </div>
 
-                  {/* Type Badge */}
-                  <div className="absolute top-3 right-3 bg-amber-500 text-slate-950 px-2 py-1 rounded-lg text-[9px] font-extrabold uppercase tracking-wider">
-                    {item.type === 'movie' ? 'Movie' : 'Series'}
-                  </div>
-
-                  {/* Favorites badge indicator */}
-                  {isFav && (
-                    <div className="absolute bottom-3 right-3 p-1.5 bg-red-500 text-white rounded-full">
-                      <Heart className="w-3.5 h-3.5 fill-current" />
+                  {/* Content */}
+                  <div className="p-5 flex flex-col flex-grow justify-between space-y-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5 text-xs text-slate-500 font-bold">
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>{item.year}</span>
+                        <span>•</span>
+                        <span className="truncate max-w-[150px]">{item.genre.join(', ')}</span>
+                      </div>
+                      <h3 className="font-extrabold text-slate-100 group-hover:text-amber-500 transition-colors line-clamp-1">
+                        {item.title}
+                      </h3>
+                      <p className="text-[10px] text-slate-400 italic line-clamp-1 font-mono">
+                        {item.originalTitle || item.title}
+                      </p>
                     </div>
-                  )}
-                </div>
 
-                {/* Content */}
-                <div className="p-5 flex flex-col flex-grow justify-between space-y-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-1.5 text-xs text-slate-500 font-bold">
-                      <Calendar className="w-3.5 h-3.5" />
-                      <span>{item.year}</span>
-                      <span>•</span>
-                      <span className="truncate max-w-[150px]">{item.genre.join(', ')}</span>
-                    </div>
-                    <h3 className="font-extrabold text-slate-100 group-hover:text-amber-500 transition-colors line-clamp-1">
-                      {item.title}
-                    </h3>
-                    <p className="text-[10px] text-slate-400 italic line-clamp-1 font-mono">
-                      {item.originalTitle || item.title}
+                    <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
+                      {item.descriptionSw}
                     </p>
-                  </div>
 
-                  <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
-                    {item.descriptionSw}
-                  </p>
-
-                  <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
-                    <span className="text-[10px] bg-slate-800 text-slate-300 font-bold px-2.5 py-1 rounded-lg">
-                      {item.subtitles.length} Subtitles
-                    </span>
-                    <span className="text-xs font-bold text-amber-500 group-hover:underline flex items-center gap-0.5">
-                      Fungua Pakua <ChevronRight className="w-4 h-4" />
-                    </span>
+                    <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
+                      <span className="text-[10px] bg-slate-800 text-slate-300 font-bold px-2.5 py-1 rounded-lg">
+                        {item.subtitles.length} Subtitles
+                      </span>
+                      <span className="text-xs font-bold text-amber-500 group-hover:underline flex items-center gap-0.5">
+                        Fungua Pakua <ChevronRight className="w-4 h-4" />
+                      </span>
+                    </div>
                   </div>
-                </div>
-              </motion.div>
-            );
-          })}
+                </motion.div>
+              );
+            })}
+          </div>
+
+          {/* Notice & Expand Button when limiting to 4 items in default view */}
+          {isDefaultView && filteredItems.length > 4 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-5 bg-slate-900/60 border border-slate-800 rounded-3xl text-center sm:text-left">
+              <div className="space-y-1">
+                <h4 className="text-sm font-bold text-slate-200">
+                  {showAll 
+                    ? `Zinaonyeshwa filamu zote ${filteredItems.length}` 
+                    : `Inaonyesha filamu 4 tu za mwisho kusajiliwa`
+                  }
+                </h4>
+                <p className="text-xs text-slate-400">
+                  {showAll
+                    ? `Tumia kisanduku cha kutafuta hapo juu kupata filamu maalum.`
+                    : `Ili kupata filamu nyingine zaidi ya hizi 4, tumia sehemu ya kutafuta hapo juu au bofya button upande wa kulia.`
+                  }
+                </p>
+              </div>
+              <button
+                onClick={() => setShowAll(!showAll)}
+                className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 font-extrabold text-xs rounded-xl transition-all shadow-lg shadow-amber-500/10 flex-shrink-0"
+              >
+                {showAll ? 'Onyesha 4 Tu za Hivi Karibuni' : `Tazama Zote (${filteredItems.length})`}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
